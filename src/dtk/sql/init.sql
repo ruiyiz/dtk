@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS SecurityMaster (
     Currency VARCHAR DEFAULT 'USD',
     ExchangeCode VARCHAR DEFAULT 'US',
     BlpTicker VARCHAR,
+    TiingoTicker VARCHAR,
     InceptionDate DATE,
     TerminationDate DATE,
     IsActive BOOLEAN DEFAULT TRUE,
