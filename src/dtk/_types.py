@@ -8,6 +8,10 @@ class SecurityType(StrEnum):
     FX = "FX"
     WARRANT = "Warrant"
     CASH = "Cash"
+    COMMON_STOCK = "Common Stock"
+    MF = "MF"
+    PRIVATE_FUND = "Private Fund"
+    MM = "MM"
 
 
 class Periodicity(StrEnum):
