@@ -420,7 +420,12 @@ def cdu_dataset(store: Store, df: pl.DataFrame, dataset: str) -> int:
         id_values = [ticker_to_id.get(t) for t in df["Ticker"].to_list()]
         df = df.with_columns(pl.Series("SecurityId", id_values, dtype=pl.Int64))
 
-    pk_map = {"dividend": "DividendId", "event": "EventId", "adjfactor": "AdjFactorId"}
+    pk_map = {
+        "dividend": "DividendId",
+        "event": "EventId",
+        "adjfactor": "AdjFactorId",
+        "transaction": "TransactionId",
+    }
     pk_col = pk_map.get(dataset)
 
     cols = df.columns
@@ -440,6 +445,60 @@ def cdu_dataset(store: Store, df: pl.DataFrame, dataset: str) -> int:
     rows = [list(row.values()) for row in df.to_dicts()]
     store._backend._conn.executemany(sql, rows)
     return len(df)
+
+
+def cdu_position(store: Store, df: pl.DataFrame) -> int:
+    """Upload position snapshots (upsert to Position table).
+
+    Parameters
+    ----------
+    store:
+        The Store instance.
+    df:
+        Must contain SecurityId (or Ticker), PortfolioId, ValueDate, Shares.
+        Optional: CostBasis, MarketValue.
+
+    Returns
+    -------
+    Number of rows upserted.
+    """
+    required = {"PortfolioId", "ValueDate", "Shares"}
+    missing = required - set(df.columns)
+    if missing:
+        raise DtkValueError(f"Missing required columns: {', '.join(sorted(missing))}")
+
+    if "SecurityId" not in df.columns:
+        if "Ticker" not in df.columns:
+            raise DtkValueError("Input must have SecurityId or Ticker column")
+        secs = lookup_securities(
+            store, df["Ticker"].to_list(), id_type="ticker", include_inactive=True
+        )
+        ticker_to_id = dict(zip(secs["Ticker"].to_list(), secs["Id"].to_list()))
+        id_values = [ticker_to_id.get(t) for t in df["Ticker"].to_list()]
+        df = df.with_columns(pl.Series("SecurityId", id_values, dtype=pl.Int64))
+
+    pos_cols = ["SecurityId", "PortfolioId", "ValueDate", "Shares"]
+    for opt in ("CostBasis", "MarketValue"):
+        if opt in df.columns:
+            pos_cols.append(opt)
+
+    upload = df.select(pos_cols).with_columns(pl.col("ValueDate").cast(pl.Date))
+
+    cols = upload.columns
+    cols_quoted = ", ".join(f'"{c}"' for c in cols)
+    placeholders = ", ".join(["?"] * len(cols))
+    update_cols = [
+        c for c in cols if c not in ("SecurityId", "PortfolioId", "ValueDate")
+    ]
+    set_clause = ", ".join(f'"{c}" = excluded."{c}"' for c in update_cols)
+
+    sql = (
+        f"INSERT INTO Position ({cols_quoted}) VALUES ({placeholders}) "
+        f"ON CONFLICT (SecurityId, PortfolioId, ValueDate) DO UPDATE SET {set_clause}"
+    )
+    rows = [list(row.values()) for row in upload.to_dicts()]
+    store._backend._conn.executemany(sql, rows)
+    return len(upload)
 
 
 def cdu_override(
@@ -491,7 +550,8 @@ def cdu_override(
 
     sql = """
         INSERT INTO FieldOverride
-          (SecurityId, FieldId, ValueDate, ValChr, ValDbl, ValInt, ValDate, Reason, CreatedBy)
+          (SecurityId, FieldId, ValueDate,
+           ValChr, ValDbl, ValInt, ValDate, Reason, CreatedBy)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (SecurityId, FieldId, ValueDate) DO UPDATE SET
           ValChr = excluded.ValChr,

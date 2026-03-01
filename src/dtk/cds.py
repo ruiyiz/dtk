@@ -142,6 +142,46 @@ def cds_adjfactor(
     )
 
 
+def cds_position(
+    store: Store,
+    x: list[str] | list[int],
+    start_dt: date | None = None,
+    end_dt: date | None = None,
+    portfolio_id: str | None = None,
+    id_type: str = "ticker",
+) -> pl.DataFrame:
+    return cds(
+        store,
+        x,
+        "position",
+        start_dt=start_dt,
+        end_dt=end_dt,
+        id_type=id_type,
+        portfolio_id=portfolio_id,
+    )
+
+
+def cds_transaction(
+    store: Store,
+    x: list[str] | list[int],
+    start_dt: date | None = None,
+    end_dt: date | None = None,
+    portfolio_id: str | None = None,
+    transaction_type: str | None = None,
+    id_type: str = "ticker",
+) -> pl.DataFrame:
+    return cds(
+        store,
+        x,
+        "transaction",
+        start_dt=start_dt,
+        end_dt=end_dt,
+        id_type=id_type,
+        portfolio_id=portfolio_id,
+        transaction_type=transaction_type,
+    )
+
+
 def _build_extra_filters(dataset: str, params: dict) -> list[str]:
     filters: list[str] = []
 
@@ -167,5 +207,15 @@ def _build_extra_filters(dataset: str, params: dict) -> list[str]:
     elif dataset == "adjfactor":
         if params.get("adj_type") is not None:
             filters.append(f"AdjType = '{params['adj_type']}'")
+
+    elif dataset == "position":
+        if params.get("portfolio_id") is not None:
+            filters.append(f"t.PortfolioId = '{params['portfolio_id']}'")
+
+    elif dataset == "transaction":
+        if params.get("portfolio_id") is not None:
+            filters.append(f"t.PortfolioId = '{params['portfolio_id']}'")
+        if params.get("transaction_type") is not None:
+            filters.append(f"t.TransactionType = '{params['transaction_type']}'")
 
     return filters

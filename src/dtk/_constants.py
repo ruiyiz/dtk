@@ -65,6 +65,25 @@ DATA_SETS: dict[str, DataSetDef] = {
             "Description",
         ),
     ),
+    "position": DataSetDef(
+        table="Position",
+        date_col="ValueDate",
+        fields=("ValueDate", "PortfolioId", "Shares", "CostBasis", "MarketValue"),
+    ),
+    "transaction": DataSetDef(
+        table="Transaction",
+        date_col="TradeDate",
+        fields=(
+            "TradeDate",
+            "PortfolioId",
+            "TransactionType",
+            "Shares",
+            "Price",
+            "Proceeds",
+            "RealizedPl",
+            "Description",
+        ),
+    ),
 }
 
 # Maps field mnemonics to wide-table column names

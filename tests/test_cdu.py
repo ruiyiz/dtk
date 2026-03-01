@@ -3,7 +3,7 @@ from datetime import date
 import polars as pl
 import pytest
 
-from dtk.cdu import cdu, cdu_dataset, cdu_pricing, cdu_security
+from dtk.cdu import cdu, cdu_dataset, cdu_position, cdu_pricing, cdu_security
 from dtk.errors import DtkValueError
 
 
@@ -67,6 +67,66 @@ def test_cdu_dataset_unknown(seeded_store):
     df = pl.DataFrame({"SecurityId": [1]})
     with pytest.raises(DtkValueError):
         cdu_dataset(seeded_store, df, "unknown")
+
+
+def test_cdu_position_basic(seeded_store):
+    df = pl.DataFrame(
+        {
+            "Ticker": ["SPY"],
+            "PortfolioId": ["test"],
+            "ValueDate": [date(2024, 1, 2)],
+            "Shares": [100.0],
+        }
+    )
+    n = cdu_position(seeded_store, df)
+    assert n == 1
+    result = seeded_store._backend.query(
+        "SELECT Shares FROM Position "
+        "WHERE PortfolioId = 'test' AND ValueDate = '2024-01-02'"
+    )
+    assert result["Shares"][0] == 100.0
+
+
+def test_cdu_position_upsert(seeded_store):
+    df1 = pl.DataFrame(
+        {
+            "Ticker": ["SPY"],
+            "PortfolioId": ["test"],
+            "ValueDate": [date(2024, 1, 2)],
+            "Shares": [100.0],
+        }
+    )
+    cdu_position(seeded_store, df1)
+
+    df2 = pl.DataFrame(
+        {
+            "Ticker": ["SPY"],
+            "PortfolioId": ["test"],
+            "ValueDate": [date(2024, 1, 2)],
+            "Shares": [150.0],
+        }
+    )
+    cdu_position(seeded_store, df2)
+
+    result = seeded_store._backend.query(
+        "SELECT COUNT(*) AS n FROM Position WHERE PortfolioId = 'test'"
+    )
+    assert result["n"][0] == 1
+    val = seeded_store._backend.query(
+        "SELECT Shares FROM Position WHERE PortfolioId = 'test'"
+    )
+    assert val["Shares"][0] == 150.0
+
+
+def test_cdu_position_missing_columns(seeded_store):
+    df = pl.DataFrame(
+        {
+            "Ticker": ["SPY"],
+            "ValueDate": [date(2024, 1, 2)],
+        }
+    )
+    with pytest.raises(DtkValueError):
+        cdu_position(seeded_store, df)
 
 
 def test_cdu_security_insert(seeded_store):

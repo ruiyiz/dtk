@@ -235,6 +235,40 @@ CREATE INDEX IF NOT EXISTS idx_adjfactor_security ON AdjFactor(SecurityId, Effec
 CREATE INDEX IF NOT EXISTS idx_adjfactor_type ON AdjFactor(AdjType);
 
 -- =============================================================================
+-- POSITION / TRANSACTION TABLES
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS Position (
+    SecurityId INTEGER NOT NULL,
+    PortfolioId VARCHAR NOT NULL,
+    ValueDate DATE NOT NULL,
+    Shares DOUBLE NOT NULL,
+    CostBasis DOUBLE,
+    MarketValue DOUBLE,
+    PRIMARY KEY (SecurityId, PortfolioId, ValueDate),
+    FOREIGN KEY (SecurityId) REFERENCES SecurityMaster(Id)
+);
+CREATE INDEX IF NOT EXISTS idx_position_portfolio ON Position(PortfolioId, ValueDate);
+CREATE INDEX IF NOT EXISTS idx_position_security ON Position(SecurityId, ValueDate);
+
+CREATE TABLE IF NOT EXISTS Transaction (
+    TransactionId INTEGER PRIMARY KEY,
+    SecurityId INTEGER NOT NULL,
+    PortfolioId VARCHAR NOT NULL,
+    TradeDate DATE NOT NULL,
+    TransactionType VARCHAR NOT NULL,
+    Shares DOUBLE NOT NULL,
+    Price DOUBLE,
+    Proceeds DOUBLE,
+    RealizedPl DOUBLE,
+    Description VARCHAR,
+    AsOfDate DATE DEFAULT CURRENT_DATE,
+    FOREIGN KEY (SecurityId) REFERENCES SecurityMaster(Id)
+);
+CREATE INDEX IF NOT EXISTS idx_transaction_portfolio ON Transaction(PortfolioId, TradeDate);
+CREATE INDEX IF NOT EXISTS idx_transaction_security ON Transaction(SecurityId, TradeDate);
+
+-- =============================================================================
 -- OVERRIDE TABLE (for user-specified value overrides)
 -- =============================================================================
 

@@ -12,7 +12,7 @@ from dtk._duckdb_backend import DuckDBBackend
 from dtk._field_registry import FieldRegistry
 
 if TYPE_CHECKING:
-    from dtk._types import DateMode, Days, ExchangeCode, FillMode, IdType, Periodicity
+    pass
 
 
 class Store:
@@ -179,6 +179,46 @@ class Store:
             id_type=id_type,
         )
 
+    def cds_position(
+        self,
+        x: list[str] | list[int],
+        portfolio_id: str | None = None,
+        start_dt: date | None = None,
+        end_dt: date | None = None,
+        id_type: str = "ticker",
+    ) -> pl.DataFrame:
+        from dtk.cds import cds_position
+
+        return cds_position(
+            self,
+            x,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            portfolio_id=portfolio_id,
+            id_type=id_type,
+        )
+
+    def cds_transaction(
+        self,
+        x: list[str] | list[int],
+        portfolio_id: str | None = None,
+        start_dt: date | None = None,
+        end_dt: date | None = None,
+        transaction_type: str | None = None,
+        id_type: str = "ticker",
+    ) -> pl.DataFrame:
+        from dtk.cds import cds_transaction
+
+        return cds_transaction(
+            self,
+            x,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            portfolio_id=portfolio_id,
+            transaction_type=transaction_type,
+            id_type=id_type,
+        )
+
     # ------------------------------------------------------------------
     # Data upload
     # ------------------------------------------------------------------
@@ -210,6 +250,11 @@ class Store:
         from dtk.cdu import cdu_dataset
 
         return cdu_dataset(self, df, dataset)
+
+    def cdu_position(self, df: pl.DataFrame) -> int:
+        from dtk.cdu import cdu_position
+
+        return cdu_position(self, df)
 
     def cdu_override(
         self,
