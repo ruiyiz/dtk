@@ -117,7 +117,10 @@ def _raw_data_wide(
         tbl_flds = fld_spec.filter(pl.col("StorageTable") == tbl)
         mnemonics = tbl_flds["FieldMnemonic"].to_list()
 
-        sql = f"SELECT * FROM {tbl} WHERE SecurityId IN ({ids_str}) AND ValueDate = '{dt}'"
+        sql = (
+            f"SELECT * FROM {tbl} WHERE SecurityId IN ({ids_str})"
+            f" AND ValueDate = '{dt}'"
+        )
         result = store._backend.query(sql)
         if result.is_empty():
             continue
@@ -141,6 +144,13 @@ def _raw_data_wide(
     out = parts[0]
     for part in parts[1:]:
         out = out.join(part, on="SecurityId", how="full", coalesce=True)
+
+    for col in [c for c in out.columns if c.endswith("_right")]:
+        base = col.removesuffix("_right")
+        if base in out.columns:
+            out = out.with_columns(pl.coalesce([base, col]).alias(base))
+            out = out.drop(col)
+
     return out
 
 
@@ -166,7 +176,8 @@ def _raw_data_long(
                     WITH ranked AS (
                         SELECT SecurityId, FieldId, ValChr, ValDbl, ValInt, ValDate,
                                ROW_NUMBER() OVER (
-                                   PARTITION BY SecurityId, FieldId ORDER BY AsOfDate DESC
+                                   PARTITION BY SecurityId, FieldId
+                                   ORDER BY AsOfDate DESC
                                ) AS rn
                         FROM FieldSnapshot
                         WHERE SecurityId IN ({ids_str})
@@ -218,9 +229,11 @@ def _raw_data_long(
             if date_mode == "as_of":
                 sql = f"""
                     WITH ranked AS (
-                        SELECT SecurityId, AttrName, ValChr, ValDbl, ValInt, ValDate, ValJson,
+                        SELECT SecurityId, AttrName,
+                               ValChr, ValDbl, ValInt, ValDate, ValJson,
                                ROW_NUMBER() OVER (
-                                   PARTITION BY SecurityId, AttrName ORDER BY AsOfDate DESC
+                                   PARTITION BY SecurityId, AttrName
+                                   ORDER BY AsOfDate DESC
                                ) AS rn
                         FROM SecuritySnapshot
                         WHERE SecurityId IN ({ids_str})
@@ -228,12 +241,14 @@ def _raw_data_long(
                           AND ValueDate <= '{dt}'
                           AND AsOfDate <= '{dt}'
                     )
-                    SELECT SecurityId, AttrName, ValChr, ValDbl, ValInt, ValDate, ValJson
+                    SELECT SecurityId, AttrName,
+                           ValChr, ValDbl, ValInt, ValDate, ValJson
                     FROM ranked WHERE rn = 1
                 """
             else:
                 sql = f"""
-                    SELECT SecurityId, AttrName, ValChr, ValDbl, ValInt, ValDate, ValJson
+                    SELECT SecurityId, AttrName,
+                           ValChr, ValDbl, ValInt, ValDate, ValJson
                     FROM SecuritySnapshot
                     WHERE SecurityId IN ({ids_str})
                       AND AttrName IN ({attrs_str})

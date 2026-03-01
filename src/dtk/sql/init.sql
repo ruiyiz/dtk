@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_security_active ON SecurityMaster(IsActive);
 
 CREATE TABLE IF NOT EXISTS FieldDef (
     FieldId INTEGER PRIMARY KEY,
-    FieldMnemonic VARCHAR NOT NULL UNIQUE,
+    FieldMnemonic VARCHAR NOT NULL,
     FieldName VARCHAR,
     DataType VARCHAR NOT NULL,  -- chr, dbl, int, date, json, lgl
     StorageMode VARCHAR NOT NULL,  -- wide, long
@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS FieldDef (
     IsCdh BOOLEAN DEFAULT FALSE,
     IsCds BOOLEAN DEFAULT FALSE,
     IsCdu BOOLEAN DEFAULT FALSE,
-    Description VARCHAR
+    Description VARCHAR,
+    UNIQUE (FieldMnemonic, StorageTable, Periodicity)
 );
 
 CREATE INDEX IF NOT EXISTS idx_field_mnemonic ON FieldDef(FieldMnemonic);
@@ -157,6 +158,16 @@ CREATE TABLE IF NOT EXISTS MonthlyData (
 
 CREATE INDEX IF NOT EXISTS idx_monthly_date ON MonthlyData(ValueDate);
 
+CREATE TABLE IF NOT EXISTS MacroData (
+    SecurityId INTEGER NOT NULL,
+    ValueDate  DATE NOT NULL,
+    PxLast     DOUBLE,
+    PRIMARY KEY (SecurityId, ValueDate),
+    FOREIGN KEY (SecurityId) REFERENCES SecurityMaster(Id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_macrodata_date ON MacroData(ValueDate);
+
 -- =============================================================================
 -- DATA SET TABLES (irregularly-spaced event data)
 -- =============================================================================
@@ -241,4 +252,33 @@ CREATE TABLE IF NOT EXISTS FieldOverride (
     PRIMARY KEY (SecurityId, FieldId, ValueDate),
     FOREIGN KEY (SecurityId) REFERENCES SecurityMaster(Id),
     FOREIGN KEY (FieldId) REFERENCES FieldDef(FieldId)
+);
+
+-- =============================================================================
+-- DATA QUALITY / ETL LOGGING TABLES
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS DataQualityLog (
+    LogId INTEGER PRIMARY KEY,
+    CheckName VARCHAR NOT NULL,
+    Severity VARCHAR NOT NULL,  -- error, warning, info
+    SecurityId INTEGER,
+    Ticker VARCHAR,
+    ValueDate DATE,
+    Message VARCHAR NOT NULL,
+    CheckedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_dqlog_checked ON DataQualityLog(CheckedAt DESC);
+CREATE INDEX IF NOT EXISTS idx_dqlog_severity ON DataQualityLog(Severity, CheckedAt DESC);
+
+CREATE TABLE IF NOT EXISTS EtlRunLog (
+    RunId INTEGER PRIMARY KEY,
+    ScriptName VARCHAR NOT NULL,
+    StartedAt TIMESTAMP NOT NULL,
+    FinishedAt TIMESTAMP,
+    Status VARCHAR,  -- success, failure, partial
+    RowsInserted INTEGER DEFAULT 0,
+    RowsUpdated INTEGER DEFAULT 0,
+    ErrorMessage VARCHAR
 );

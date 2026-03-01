@@ -129,22 +129,10 @@ def cdh(
 def _map_cdh_fields(
     store: Store, flds: list[str], period: str
 ) -> dict[str, pl.DataFrame]:
-    """Map fields to storage, preferring the table that matches the period."""
-    period_table_map = {"D": "Pricing", "W": "WeeklyData", "M": "MonthlyData"}
-    preferred_table = period_table_map.get(period)
-
+    """Map fields to storage tables for the requested period."""
     sub = store._fields.all.filter(
         pl.col("FieldMnemonic").is_in(flds) & pl.col("IsCdh")
     )
-
-    if preferred_table is not None and not sub.is_empty():
-        priority = (
-            pl.when(pl.col("StorageTable") == preferred_table).then(1).otherwise(2)
-        )
-        sub = sub.with_columns(priority.alias("_priority"))
-        sub = sub.sort("_priority")
-        sub = sub.unique(subset=["FieldMnemonic"], keep="first")
-        sub = sub.drop("_priority")
 
     result: dict[str, pl.DataFrame] = {}
     for mode, group in sub.group_by("StorageMode"):
@@ -198,6 +186,13 @@ def _query_cdh_wide(
     out = parts[0]
     for part in parts[1:]:
         out = out.join(part, on=["SecurityId", "ValueDate"], how="full", coalesce=True)
+
+    for col in [c for c in out.columns if c.endswith("_right")]:
+        base = col.removesuffix("_right")
+        if base in out.columns:
+            out = out.with_columns(pl.coalesce([base, col]).alias(base))
+            out = out.drop(col)
+
     return out
 
 
@@ -386,7 +381,7 @@ def _scale_tseries(
     days: str,
     partial: bool,
 ) -> pl.DataFrame:
-    """Aggregate daily data to the requested periodicity, keeping last value per period."""
+    """Scale daily data to a coarser periodicity, keeping last obs per period."""
     if df.is_empty():
         return df
 

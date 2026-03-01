@@ -12,6 +12,7 @@ class SecurityType(StrEnum):
     MF = "MF"
     PRIVATE_FUND = "Private Fund"
     MM = "MM"
+    MACRO = "Macro"
 
 
 class Periodicity(StrEnum):

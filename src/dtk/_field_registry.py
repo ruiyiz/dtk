@@ -13,9 +13,10 @@ if TYPE_CHECKING:
 class FieldRegistry:
     def __init__(self, backend: Backend) -> None:
         self._defs: pl.DataFrame = backend.query("SELECT * FROM FieldDef")
-        self._by_mnemonic: dict[str, dict] = {
-            row["FieldMnemonic"]: row for row in self._defs.to_dicts()
-        }
+        self._by_mnemonic: dict[str, dict] = {}
+        for row in self._defs.sort("FieldId").to_dicts():
+            if row["FieldMnemonic"] not in self._by_mnemonic:
+                self._by_mnemonic[row["FieldMnemonic"]] = row
 
     def get(self, mnemonic: str) -> dict | None:
         return self._by_mnemonic.get(mnemonic)
