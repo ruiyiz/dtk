@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 from dtk._constants import WIDE_COLUMN_MAP
-from dtk.convert import apply_type_map
+from dtk.convert import apply_type_map, coalesce_right_cols
 from dtk.date_utils import prev_date
 from dtk.security import lookup_securities
 
@@ -144,14 +144,7 @@ def _raw_data_wide(
     out = parts[0]
     for part in parts[1:]:
         out = out.join(part, on="SecurityId", how="full", coalesce=True)
-
-    for col in [c for c in out.columns if c.endswith("_right")]:
-        base = col.removesuffix("_right")
-        if base in out.columns:
-            out = out.with_columns(pl.coalesce([base, col]).alias(base))
-            out = out.drop(col)
-
-    return out
+    return coalesce_right_cols(out)
 
 
 def _raw_data_long(

@@ -89,6 +89,17 @@ def build_type_map(field_defs: pl.DataFrame) -> dict[str, str]:
     )
 
 
+def coalesce_right_cols(df: pl.DataFrame) -> pl.DataFrame:
+    """Coalesce _right-suffix columns from a full-outer join into their base columns."""
+    right_cols = [
+        c for c in df.columns if c.endswith("_right") and c[:-6] in df.columns
+    ]
+    if not right_cols:
+        return df
+    exprs = [pl.coalesce([c[:-6], c]).alias(c[:-6]) for c in right_cols]
+    return df.with_columns(exprs).drop(right_cols)
+
+
 def dates_to_str(df: pl.DataFrame) -> pl.DataFrame:
     """Convert all Date columns to ISO string for DuckDB insertion."""
     casts = [
