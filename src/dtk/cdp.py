@@ -450,9 +450,12 @@ def _fill_previous(
     if prev_df.is_empty():
         return df
 
-    prev_vals = prev_df.select(["SecurityId"] + fld_cols_present)
+    fillable = [f for f in fld_cols_present if f in prev_df.columns]
+    if not fillable:
+        return df
+    prev_vals = prev_df.select(["SecurityId"] + fillable)
     out = df.clone()
-    for col in fld_cols_present:
+    for col in fillable:
         fill_col = prev_vals.select(["SecurityId", pl.col(col).alias(f"_fill_{col}")])
         out = out.join(fill_col, on="SecurityId", how="left")
         out = out.with_columns(
